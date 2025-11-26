@@ -5,6 +5,7 @@ urlpatterns = [
     # AUTH ROUTES
     path('api/register/', auth_views.RegisterAPIView.as_view(), name='register'),
     path('api/login/', auth_views.LoginAPIView.as_view(), name='login'),
+    
     # STUDENT ROUTES
     path('api/jobs/', api_views.JobListAPIView.as_view(), name='job-list'),
     path('api/apply/<uuid:job_id>/', api_views.ApplyJobAPIView.as_view(), name='apply-job'),
