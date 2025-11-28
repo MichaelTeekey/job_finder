@@ -69,16 +69,16 @@ REST_FRAMEWORK = {
 }
 SPECTACULAR_SETTINGS = {
     # --- General info ---
-    "TITLE": "Habinest API",
-    "DESCRIPTION": "Backend API documentation for Habinest platform.",
+    "TITLE": "Jobs API",
+    "DESCRIPTION": "Backend API documentation for jobs platform.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 
     # --- UI Customization ---
     "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
     "SERVERS": [
-        {"url": "https://api.tintarmac.co.zw", "description": "Production"},
-        {"url": "https://staging.habinest.com", "description": "Staging"},
+        {"url": "https://http://jobs.zomacdigital.co.zw/", "description": "Production"},
+        {"url": "https://staging.JobFinder.com", "description": "Staging"},
         {"url": "http://localhost:8000", "description": "Local development"},
     ],
 
