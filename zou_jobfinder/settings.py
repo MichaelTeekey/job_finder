@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-=d6xctr$k5s6y--*k*_my%gvk5@q5(3n(=9vo1s#__3_c+=2!n
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['http://jobs.zomacdigital.co.zw/', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['http://jobs.zomacdigital.co.zw','http://jobs.zomacdigital.co.zw/job_finder/', 'localhost', '127.0.0.1']
 
 
 # Application definition
