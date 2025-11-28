@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-=d6xctr$k5s6y--*k*_my%gvk5@q5(3n(=9vo1s#__3_c+=2!n
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['http://jobs.zomacdigital.co.zw/', 'localhost', '127.0.0.1']
 
 
 # Application definition
@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'core',
+    'drf_spectacular',
+    'drf_spectacular_sidecar',  
 ]
 
 MIDDLEWARE = [
@@ -61,7 +63,59 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ]
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+
+}
+SPECTACULAR_SETTINGS = {
+    # --- General info ---
+    "TITLE": "Habinest API",
+    "DESCRIPTION": "Backend API documentation for Habinest platform.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+
+    # --- UI Customization ---
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
+    "SERVERS": [
+        {"url": "https://api.tintarmac.co.zw", "description": "Production"},
+        {"url": "https://staging.habinest.com", "description": "Staging"},
+        {"url": "http://localhost:8000", "description": "Local development"},
+    ],
+
+    # --- Schema customization ---
+    "COMPONENT_SPLIT_REQUEST": True,  # separates request/response schemas
+    "SORT_OPERATIONS": True,          # consistent ordering in docs
+    "SORT_OPERATION_PARAMETERS": True,
+    "COMPONENT_NO_READ_ONLY_REQUIRED": True,
+
+    # --- Auth & Security ---
+    "SECURITY": [
+        {
+            "bearerAuth": [],
+        },
+    ],
+    "SECURITY_DEFINITIONS": {
+        "bearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+    },
+
+    # --- Performance / Dev Experience ---
+    "PREPROCESSING_HOOKS": [],  # (optional: customize schema preprocessing)
+    "POSTPROCESSING_HOOKS": [], # (optional: custom OpenAPI transforms)
+    "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": False,  # cleaner schemas
+    "CAMELIZE_NAMES": False,  # keep snake_case consistency
+
+    # --- UI behavior ---
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "displayOperationId": True,
+        "filter": True,
+        "showExtensions": True,
+        "showCommonExtensions": True,
+    },
 }
 
 TEMPLATES = [
@@ -98,6 +152,7 @@ DATABASES = {
     #     'HOST': 'localhost',
     #     'PORT': '3306',
     # }
+    # to use mysql first mysql_client package should be installed
 }
 
 
