@@ -1,122 +1,151 @@
-from django.contrib.auth import get_user_model
-from rest_framework import status
+import io
+from django.urls import reverse
 from rest_framework.test import APITestCase
+from rest_framework import status
+from django.contrib.auth import get_user_model
+from core.models import Job, Application, Resume  # adjust import paths
+from rest_framework_simplejwt.tokens import RefreshToken
 
 User = get_user_model()
 
 
-class AuthViewsTests(APITestCase):
+class JobApplicationTests(APITestCase):
+
     def setUp(self):
-        self.register_url = '/api/register/'
-        self.login_url = '/api/login/'
+        # ----------------------------
+        # Create users
+        # ----------------------------
+        self.student = User.objects.create_user(
+            username="student1", email="student1@test.com", password="123456", role="student"
+        )
+        self.employer = User.objects.create_user(
+            username="employer1", email="emp1@test.com", password="123456", role="employer"
+        )
+        self.other_employer = User.objects.create_user(
+            username="employer2", email="emp2@test.com", password="123456", role="employer"
+        )
+        self.admin = User.objects.create_user(
+            username="admin1", email="admin@test.com", password="123456", role="admin", is_staff=True, is_superuser=True
+        )
 
-    def test_register_success(self):
-        data = {
-            'username': 'alice',
-            'email': 'alice@example.com',
-            'password': 'strong-password-123',
-            'role': 'student'
-        }
-        resp = self.client.post(self.register_url, data, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-        self.assertIn('access', resp.data)
-        self.assertIn('refresh', resp.data)
-        self.assertIn('user', resp.data)
-        self.assertEqual(resp.data['user']['email'], data['email'])
-        self.assertTrue(User.objects.filter(email=data['email']).exists())
+        # ----------------------------
+        # JWT tokens
+        # ----------------------------
+        self.student_token = str(RefreshToken.for_user(self.student).access_token)
+        self.emp_token = str(RefreshToken.for_user(self.employer).access_token)
+        self.other_emp_token = str(RefreshToken.for_user(self.other_employer).access_token)
+        self.admin_token = str(RefreshToken.for_user(self.admin).access_token)
 
-    def test_register_duplicate_email(self):
-        email = 'bob@example.com'
-        User.objects.create_user(username='bob', email=email, password='pwd123')
-        data = {'username': 'bob2', 'email': email, 'password': 'pwd456'}
-        resp = self.client.post(self.register_url, data, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('error', resp.data)
+    # ----------------------------
+    # Helper method to auth client
+    # ----------------------------
+    def auth(self, token):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 
-    def test_login_success(self):
-        email = 'carol@example.com'
-        password = 'login-pass-1'
-        # create user in DB first
-        User.objects.create_user(username='carol', email=email, password=password)
-        data = {'email': email, 'password': password}
-        resp = self.client.post(self.login_url, data, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertIn('access', resp.data)
-        self.assertIn('refresh', resp.data)
-        self.assertIn('user', resp.data)
-        self.assertEqual(resp.data['user']['email'], email)
+    # ----------------------------
+    # STUDENT TESTS
+    # ----------------------------
+    def test_student_can_view_jobs(self):
+        Job.objects.create(employer=self.employer, title="Backend", description="Django", approved=True)
+        self.auth(self.student_token)
+        res = self.client.get(reverse("job-list"))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(len(res.data) >= 1)
 
-    def test_login_invalid_credentials(self):
-        email = 'dave@example.com'
-        password = 'correct-pass'
-        User.objects.create_user(username='dave', email=email, password=password)
-        data = {'email': email, 'password': 'wrong-pass'}
-        resp = self.client.post(self.login_url, data, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertIn('error', resp.data)
-# from django.contrib.auth import get_user_model
-# from rest_framework import status
-# from rest_framework.test import APITestCase
-# from .models import Job
-# import uuid
+    def test_student_cannot_create_jobs(self):
+        self.auth(self.student_token)
+        res = self.client.post(reverse("employer-job-create"), {"title": "Hack", "description": "Illegal"})
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-# User = get_user_model()
+    def test_student_can_apply_once_and_cannot_reapply(self):
+        job = Job.objects.create(employer=self.employer, title="Intern", description="Desc", approved=True)
+        self.auth(self.student_token)
+        # first application
+        res1 = self.client.post(reverse("apply-job", args=[job.id]))
+        self.assertEqual(res1.status_code, status.HTTP_201_CREATED)
+        # second application → fail
+        res2 = self.client.post(reverse("apply-job", args=[job.id]))
+        self.assertEqual(res2.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_student_cannot_apply_unapproved_job(self):
+        job = Job.objects.create(employer=self.employer, title="Unapproved", description="Desc", approved=False)
+        self.auth(self.student_token)
+        res = self.client.post(reverse("apply-job", args=[job.id]))
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
-# class AdminJobViewsTests(APITestCase):
-#     def setUp(self):
-#         # users
-#         self.admin = User.objects.create_user(
-#             username='admin', email='admin@example.com', password='adminpass', role='admin', is_staff=True
-#         )
-#         self.employer = User.objects.create_user(
-#             username='emp', email='emp@example.com', password='emppass', role='employer'
-#         )
+    def test_student_can_view_own_applications(self):
+        job = Job.objects.create(employer=self.employer, title="Intern", description="Desc", approved=True)
+        Application.objects.create(job=job, student=self.student)
+        self.auth(self.student_token)
+        res = self.client.get(reverse("student-applications"))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
 
-#         # jobs
-#         self.unapproved_job = Job.objects.create(
-#             employer=self.employer,
-#             title='Unapproved Internship',
-#             description='To be approved',
-#             approved=False
-#         )
-#         self.approved_job = Job.objects.create(
-#             employer=self.employer,
-#             title='Approved Internship',
-#             description='Already approved',
-#             approved=True
-#         )
+    def test_student_resume_upload_success_and_fail(self):
+        self.auth(self.student_token)
+        # upload with file → success
+        file = io.BytesIO(b"Test resume content")
+        file.name = "resume.pdf"
+        res = self.client.post(reverse("upload-resume"), {"file": file}, format='multipart')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        # upload without file → fail
+        res2 = self.client.post(reverse("upload-resume"), {})
+        self.assertEqual(res2.status_code, status.HTTP_400_BAD_REQUEST)
 
-#         self.pending_url = '/api/admin/pending-jobs/'
-#         self.approve_url = f'/api/admin/approve/{self.unapproved_job.id}/'
+    # ----------------------------
+    # EMPLOYER TESTS
+    # ----------------------------
+    def test_employer_create_update_delete_job(self):
+        self.auth(self.emp_token)
+        # create
+        res_create = self.client.post(reverse("employer-job-create"), {"title": "Backend Dev", "description": "Desc"})
+        self.assertEqual(res_create.status_code, status.HTTP_201_CREATED)
+        job_id = res_create.data["id"]
+        # update
+        res_update = self.client.put(reverse("employer-job-update", args=[job_id]), {"title": "Updated", "description": "New Desc"})
+        self.assertEqual(res_update.status_code, status.HTTP_200_OK)
+        # delete
+        res_delete = self.client.delete(reverse("employer-job-delete", args=[job_id]))
+        self.assertEqual(res_delete.status_code, status.HTTP_200_OK)
 
-#     def test_pending_jobs_visible_to_admin_only(self):
-#         # admin can view pending jobs
-#         self.client.force_authenticate(user=self.admin)
-#         resp = self.client.get(self.pending_url)
-#         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-#         # only unapproved jobs should be returned
-#         ids = [item.get('id') for item in resp.data]
-#         self.assertIn(str(self.unapproved_job.id), ids)
-#         self.assertNotIn(str(self.approved_job.id), ids)
+    def test_other_employer_cannot_edit_or_delete_others_job(self):
+        job = Job.objects.create(employer=self.employer, title="Job", description="Desc")
+        self.auth(self.other_emp_token)
+        res_update = self.client.put(reverse("employer-job-update", args=[job.id]), {"title": "Hack", "description": "No"})
+        self.assertEqual(res_update.status_code, status.HTTP_403_FORBIDDEN)
+        res_delete = self.client.delete(reverse("employer-job-delete", args=[job.id]))
+        self.assertEqual(res_delete.status_code, status.HTTP_403_FORBIDDEN)
 
-#     def test_pending_jobs_forbidden_for_non_admin(self):
-#         self.client.force_authenticate(user=self.employer)
-#         resp = self.client.get(self.pending_url)
-#         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+    def test_employer_can_view_applications_and_update_status(self):
+        job = Job.objects.create(employer=self.employer, title="Job", description="Desc", approved=True)
+        app = Application.objects.create(job=job, student=self.student)
+        self.auth(self.emp_token)
+        # view applications
+        res = self.client.get(reverse("employer-job-applications", args=[job.id]))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        # update application status
+        res2 = self.client.post(reverse("update-application-status", args=[app.id]), {"status": "accepted"})
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+        app.refresh_from_db()
+        self.assertEqual(app.status, "accepted")
+        # other employer cannot update
+        self.auth(self.other_emp_token)
+        res3 = self.client.post(reverse("update-application-status", args=[app.id]), {"status": "rejected"})
+        self.assertEqual(res3.status_code, status.HTTP_403_FORBIDDEN)
 
-#     def test_admin_can_approve_job(self):
-#         self.client.force_authenticate(user=self.admin)
-#         resp = self.client.post(self.approve_url)
-#         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-#         self.assertEqual(resp.data.get('message'), 'Job approved successfully.')
-#         # refresh from db
-#         self.unapproved_job.refresh_from_db()
-#         self.assertTrue(self.unapproved_job.approved)
-
-#     def test_non_admin_cannot_approve(self):
-#         self.client.force_authenticate(user=self.employer)
-#         resp = self.client.post(self.approve_url)
-#         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
-#         self.unapproved_job.refresh_from_db()
-#         self.assertFalse(self.unapproved_job.approved)
+    # ----------------------------
+    # ADMIN TESTS
+    # ----------------------------
+    def test_admin_can_view_pending_and_approve(self):
+        job = Job.objects.create(employer=self.employer, title="Pending", description="Desc", approved=False)
+        self.auth(self.admin_token)
+        # view pending
+        res = self.client.get(reverse("pending-jobs"))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        # approve
+        res2 = self.client.post(reverse("approve-job", args=[job.id]))
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+        job.refresh_from_db()
+        self.assertTrue(job.approved)

@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import User, Job, Application, Resume
 
-
 # ---------------------------------------------------------
 # USER SERIALIZER
 # ---------------------------------------------------------
@@ -12,7 +11,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 # ---------------------------------------------------------
-# JOB SERIALIZER (for reading job data)
+# JOB SERIALIZER (for reading job data, nested employer info)
 # ---------------------------------------------------------
 class JobSerializer(serializers.ModelSerializer):
     employer = UserSerializer(read_only=True)
@@ -33,7 +32,7 @@ class JobSerializer(serializers.ModelSerializer):
 
 
 # ---------------------------------------------------------
-# JOB CREATE SERIALIZER (employer creates job)
+# JOB CREATE / UPDATE SERIALIZER (employer creates/edits job)
 # ---------------------------------------------------------
 class JobCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -42,7 +41,7 @@ class JobCreateSerializer(serializers.ModelSerializer):
 
 
 # ---------------------------------------------------------
-# APPLICATION SERIALIZER
+# APPLICATION SERIALIZER (nested student + job info)
 # ---------------------------------------------------------
 class ApplicationSerializer(serializers.ModelSerializer):
     job = JobSerializer(read_only=True)
@@ -54,14 +53,15 @@ class ApplicationSerializer(serializers.ModelSerializer):
             'id',
             'job',
             'student',
-            'status',
-            'match_score',
+            'status',       # allow employer to update (accepted/rejected)
+            'match_score',  # read-only score generated on application
             'created_at',
         ]
+        read_only_fields = ['match_score', 'created_at']
 
 
 # ---------------------------------------------------------
-# RESUME SERIALIZER
+# RESUME SERIALIZER (nested student info)
 # ---------------------------------------------------------
 class ResumeSerializer(serializers.ModelSerializer):
     student = UserSerializer(read_only=True)
@@ -76,4 +76,4 @@ class ResumeSerializer(serializers.ModelSerializer):
             'feedback',
             'uploaded_at',
         ]
-        read_only_fields = ['resume_score', 'feedback']
+        read_only_fields = ['resume_score', 'feedback', 'uploaded_at']

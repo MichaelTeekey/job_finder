@@ -61,16 +61,21 @@ CORS_ALLOW_ALL_ORIGINS = True
 ROOT_URLCONF = 'zou_jobfinder.urls'
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
+    # Authentication: use JWT
+    'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ],
+    ),
+    
+    # Permission: default to authenticated users
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    
+    # Schema for API docs
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-
 }
+
+
 SPECTACULAR_SETTINGS = {
     # --- General info ---
     "TITLE": "Jobs API",
@@ -144,18 +149,18 @@ WSGI_APPLICATION = 'zou_jobfinder.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    # 'default': {
-    #     'ENGINE': 'django.db.backends.sqlite3',
-    #     'NAME': BASE_DIR / 'db.sqlite3',
-    # }
-    'default':{
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'zomacdig_jobs',
-        'USER': 'zomacdig_jobs',
-        'PASSWORD': '6*XQ82Vq4Jl3,uIM',
-        'HOST': 'localhost',
-        'PORT': '3306',
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
+    # 'default':{
+    #     'ENGINE': 'django.db.backends.mysql',
+    #     'NAME': 'zomacdig_jobs',
+    #     'USER': 'zomacdig_jobs',
+    #     'PASSWORD': '6*XQ82Vq4Jl3,uIM',
+    #     'HOST': 'localhost',
+    #     'PORT': '3306',
+    # }
     # to use mysql first mysql_client package should be installed
 }
 
